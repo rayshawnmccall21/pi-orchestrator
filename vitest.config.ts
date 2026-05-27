@@ -1,0 +1,12 @@
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    root: ".",
+    include: [
+      "test/unit/**/*.test.ts",
+      "test/integration/**/*.test.ts",
+    ],
+    globals: false,
+  },
+});

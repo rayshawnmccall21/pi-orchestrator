@@ -1,0 +1,71 @@
+{
+  "name": "pi-orchestrator",
+  "version": "0.1.0",
+  "description": "Pipeline orchestrator for BMAD agent workflows — supervises child Pi sessions across git worktrees",
+  "license": "MIT",
+  "type": "module",
+  "keywords": ["pi-package", "orchestrator", "pipeline", "bmad"],
+  "files": [
+    "src/**/*.ts",
+    "skills/**/*",
+    "prompts/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "npm run test:unit",
+    "test:unit": "vitest run test/unit/",
+    "test:integration": "vitest run test/integration/",
+    "test:all": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:crap": "vitest run --coverage && node scripts/crap-report.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ test/ --max-warnings 0",
+    "lint:fix": "eslint src/ test/ --fix",
+    "lint:dead": "knip",
+    "lint:dup": "jscpd src/ --threshold 3",
+    "lint:arch": "dependency-cruiser --config .dependency-cruiser.cjs src/",
+    "format": "prettier --write src/ test/",
+    "format:check": "prettier --check src/ test/",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:coverage && npm run lint:arch && npm run lint:dead"
+  },
+  "pi": {
+    "extensions": ["./src/extension/index.ts"],
+    "skills": ["./skills"],
+    "prompts": ["./prompts"]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-coding-agent": {
+      "_note": "deprecated — migrate to @earendil-works/pi-coding-agent in a future story"
+    },
+    "@mariozechner/pi-tui": {
+      "_note": "deprecated — migrate to @earendil-works/pi-tui in a future story"
+    }
+  },
+  "dependencies": {
+    "typebox": "^1.1.24"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@types/node": "^25.7.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "dependency-cruiser": "^17.4.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-jsdoc": "^62.9.0",
+    "eslint-plugin-sonarjs": "^4.0.3",
+    "eslint-plugin-tsdoc": "^0.5.2",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "eslint-plugin-vitest": "^0.5.4",
+    "jscpd": "^4.1.1",
+    "knip": "^6.13.1",
+    "prettier": "^3.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^3.0.0"
+  }
+}
