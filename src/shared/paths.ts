@@ -12,10 +12,37 @@
  * 3. StateRoot is env override or projectRoot/.pi/orchestrator/.
  * 4. PromptPath is project override if exists, else package default.
  * 5. WorktreeBase is env ORCHESTRATOR_WORKTREE_BASE or projectRoot/.trees.
+ * 6. PiCodingAgentDir is env override or ~/.pi/agent (tilde-expanded).
  */
 
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { mkdir, access } from "node:fs/promises";
+
+/** Default Pi agent installation directory (before tilde expansion). */
+const DEFAULT_PI_CODING_AGENT_DIR_TILDE = "~/.pi/agent";
+
+/** Length of the tilde prefix "~/". */
+const TILDE_PREFIX_LENGTH = 2;
+
+/**
+ * Expand ~ to the user's home directory using HOME environment variable.
+ *
+ * @param path - Path potentially starting with ~.
+ *
+ * @returns Path with ~ replaced by home directory, or original path if not starting with ~.
+ *
+ * @example
+ * ```typescript
+ * const expanded = expandTilde("~/.pi/agent"); // "/Users/name/.pi/agent"
+ * ```
+ */
+function expandTilde(path: string): string {
+  if (!path.startsWith("~/")) {
+    return path;
+  }
+  const home = process.env["HOME"] ?? process.env["USERPROFILE"] ?? ".";
+  return normalize(join(home, path.slice(TILDE_PREFIX_LENGTH)));
+}
 
 /**
  * All resolved filesystem paths used by the orchestrator runtime.
@@ -33,10 +60,12 @@ export interface OrchestratorPaths {
   readonly worktreeRegistryPath: string;
   /** Audit log directory path. */
   readonly logRoot: string;
-  /** Resolved prompt (project override \> package default). */
+  /** Resolved prompt (project override gt package default). */
   readonly promptPath: string;
   /** Worker worktree base directory. */
   readonly worktreeBase: string;
+  /** The pi-coding-agent installation directory. */
+  readonly piCodingAgentDir: string;
   /** The pi-bmad extension path for child workers. */
   readonly piBmadExtensionPath: string;
   /** The pi-pi extension path for child workers. */
@@ -84,11 +113,15 @@ export async function resolveOrchestratorPaths(opts: {
 
   const worktreeBase = env["ORCHESTRATOR_WORKTREE_BASE"] ?? join(projectRoot, ".trees");
 
-  const piCodingAgentDir = env["PI_CODING_AGENT_DIR"] ?? "";
+  // Resolve PI_CODING_AGENT_DIR with tilde expansion and default fallback
+  const piCodingAgentDirRaw = env["PI_CODING_AGENT_DIR"];
+  const piCodingAgentDir =
+    piCodingAgentDirRaw !== undefined && piCodingAgentDirRaw !== ""
+      ? expandTilde(piCodingAgentDirRaw)
+      : expandTilde(DEFAULT_PI_CODING_AGENT_DIR_TILDE);
+
   const piBmadExtensionPath = join(projectRoot, "extensions", "pi-bmad.ts");
-  const piPiExtensionPath = piCodingAgentDir
-    ? join(piCodingAgentDir, "extensions", "pi-pi.ts")
-    : "";
+  const piPiExtensionPath = join(piCodingAgentDir, "extensions", "pi-pi.ts");
 
   await mkdir(stateRoot, { recursive: true });
   await mkdir(logRoot, { recursive: true });
@@ -100,6 +133,7 @@ export async function resolveOrchestratorPaths(opts: {
     logRoot,
     promptPath,
     worktreeBase,
+    piCodingAgentDir,
     piBmadExtensionPath,
     piPiExtensionPath,
   });
@@ -119,6 +153,8 @@ interface PathInputs {
   promptPath: string;
   /** Worktree base directory. */
   worktreeBase: string;
+  /** Pi coding agent installation directory. */
+  piCodingAgentDir: string;
   /** Pi-bmad extension path. */
   piBmadExtensionPath: string;
   /** Pi-pi extension path. */
@@ -147,6 +183,7 @@ function buildPaths(inputs: PathInputs): OrchestratorPaths {
     logRoot: inputs.logRoot,
     promptPath: inputs.promptPath,
     worktreeBase: inputs.worktreeBase,
+    piCodingAgentDir: inputs.piCodingAgentDir,
     piBmadExtensionPath: inputs.piBmadExtensionPath,
     piPiExtensionPath: inputs.piPiExtensionPath,
     childProjectRoot(worktreePath: string): string {

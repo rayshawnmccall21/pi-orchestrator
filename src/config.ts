@@ -21,6 +21,9 @@ const DEFAULT_STALE_THRESHOLD_MS = 600_000;
 const DEFAULT_PROMPT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_REVIEW_LOOPS = 3;
 
+/** Default Pi agent installation directory (tilde-style, expanded by paths.ts). */
+const DEFAULT_PI_CODING_AGENT_DIR = "~/.pi/agent";
+
 const LOG_LEVEL_MAP: Readonly<Record<string, LogLevel>> = {
   debug: "debug",
   info: "info",
@@ -74,7 +77,7 @@ export interface OrchestratorConfig {
   worktreeBaseOverride: string | null;
   /** Optional state root directory override, or null if not set. */
   stateRootOverride: string | null;
-  /** Absolute path to the Pi coding agent installation directory. */
+  /** Absolute path to the Pi coding agent installation directory (tilde-style). */
   piCodingAgentDir: string;
 }
 
@@ -97,7 +100,7 @@ export interface OrchestratorConfig {
  * ```
  */
 export function loadConfig(env: Record<string, string | undefined>): OrchestratorConfig {
-  const piCodingAgentDir = requireNonEmptyString(env, "PI_CODING_AGENT_DIR");
+  const piCodingAgentDir = parsePiCodingAgentDir(env);
 
   return {
     maxWorkers: parsePositiveInteger(env, "ORCHESTRATOR_MAX_WORKERS", DEFAULT_MAX_WORKERS),
@@ -114,16 +117,28 @@ export function loadConfig(env: Record<string, string | undefined>): Orchestrato
 // Internal Parsers — all pure, all synchronous, no JSDoc (private)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function requireNonEmptyString(env: Record<string, string | undefined>, key: string): string {
-  const value = env[key];
-  if (value === undefined || value === "") {
-    throw new OrchestratorError(
-      `Required environment variable ${key} is not set`,
-      CONFIG_ERROR_CODE,
-      { field: key },
-    );
+/**
+ * Parses PI_CODING_AGENT_DIR with optional fallback to default.
+ *
+ * Unlike requireNonEmptyString, this does NOT throw when unset — it uses
+ * DEFAULT_PI_CODING_AGENT_DIR (~/.pi/agent) for zero-config operation.
+ * Note: The tilde is not expanded here — paths.ts handles that.
+ *
+ * @param env - Environment variable record.
+ *
+ * @returns The PI_CODING_AGENT_DIR value or the default.
+ *
+ * @example
+ * ```typescript
+ * const dir = parsePiCodingAgentDir(env);
+ * ```
+ */
+function parsePiCodingAgentDir(env: Record<string, string | undefined>): string {
+  const value = env["PI_CODING_AGENT_DIR"];
+  if (value !== undefined && value !== "") {
+    return value;
   }
-  return value;
+  return DEFAULT_PI_CODING_AGENT_DIR;
 }
 
 function parseOptionalString(env: Record<string, string | undefined>, key: string): string | null {

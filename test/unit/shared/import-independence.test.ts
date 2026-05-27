@@ -10,7 +10,6 @@ import { fileURLToPath } from "node:url";
 
 const testFileDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(join(testFileDir, "..", "..", ".."));
-const worktreeRoot = resolve(join(packageRoot, ".."));
 
 interface Violation {
   file: string;
@@ -120,11 +119,31 @@ describe("no 'any' in owned files — AC-5, INV-2 BLOCKING", () => {
   });
 });
 
-describe("root types file not deleted — AC-4", () => {
-  it("pi-bmad root src/types.ts still exists", () => {
-    const p = join(worktreeRoot, "src", "types.ts");
-    expect(existsSync(p)).toBe(true);
-    if (existsSync(p)) expect(statSync(p).size).toBeGreaterThan(0);
+describe("standalone package owns its types — AC-4", () => {
+  it("pi-orchestrator root src/types.ts does NOT exist (no cross-contamination)", () => {
+    // Standalone packages should NOT have a root src/types.ts that shadows the worktree
+    const rootTypes = join(packageRoot, "src", "types.ts");
+    const sharedTypes = join(packageRoot, "src", "shared", "types.ts");
+
+    // The package MUST have its own types in src/shared/
+    expect(existsSync(sharedTypes)).toBe(true);
+    if (existsSync(sharedTypes)) {
+      expect(statSync(sharedTypes).size).toBeGreaterThan(0);
+    }
+
+    // Root src/types.ts should NOT exist (would cause import ambiguity)
+    if (existsSync(rootTypes)) {
+      expect.fail(
+        `BLOCKING (AC-4): pi-orchestrator has a root src/types.ts which causes import ambiguity. ` +
+          `Types should live in src/shared/types.ts for standalone packages.`,
+      );
+    }
+  });
+
+  it("types.ts resolves inside pi-orchestrator/ (not a symlink)", () => {
+    const p = join(packageRoot, "src", "shared", "types.ts");
+    if (!existsSync(p)) return;
+    expect(realpathSync(p).startsWith(packageRoot)).toBe(true);
   });
 });
 
@@ -139,11 +158,5 @@ describe("owned files exist — AC-1, AC-2", () => {
     const p = join(packageRoot, "src", "shared", "errors.ts");
     expect(existsSync(p)).toBe(true);
     if (existsSync(p)) expect(statSync(p).size).toBeGreaterThan(0);
-  });
-
-  it("types.ts resolves inside pi-orchestrator/ (not a symlink)", () => {
-    const p = join(packageRoot, "src", "shared", "types.ts");
-    if (!existsSync(p)) return;
-    expect(realpathSync(p).startsWith(packageRoot)).toBe(true);
   });
 });

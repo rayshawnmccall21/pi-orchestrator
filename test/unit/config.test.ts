@@ -212,23 +212,25 @@ describe("loadConfig", () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe("AC-3: invalid values throw OrchestratorError", () => {
-    it("throws OrchestratorError when PI_CODING_AGENT_DIR is missing", () => {
-      expect(() => loadConfig({})).toThrow(OrchestratorError);
+    it("returns default PI_CODING_AGENT_DIR when not set", () => {
+      const config = loadConfig({});
+      expect(config.piCodingAgentDir).toBe("~/.pi/agent");
     });
 
-    it("throws OrchestratorError when PI_CODING_AGENT_DIR is empty", () => {
-      expect(() => loadConfig({ PI_CODING_AGENT_DIR: "" })).toThrow(OrchestratorError);
+    it("returns default PI_CODING_AGENT_DIR when empty string", () => {
+      const config = loadConfig({ PI_CODING_AGENT_DIR: "" });
+      expect(config.piCodingAgentDir).toBe("~/.pi/agent");
     });
 
-    it("includes field context in error for missing PI_CODING_AGENT_DIR", () => {
+    it("includes field context in error for invalid ORCHESTRATOR_LOG_LEVEL", () => {
       try {
-        loadConfig({});
+        loadConfig({ ...minimalValidEnv(), ORCHESTRATOR_LOG_LEVEL: "invalid" });
         expect.unreachable("should have thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(OrchestratorError);
         const orchestratorError = error as OrchestratorError;
         expect(orchestratorError.context).toBeDefined();
-        expect(orchestratorError.context?.["field"]).toBe("PI_CODING_AGENT_DIR");
+        expect(orchestratorError.context?.["field"]).toBe("ORCHESTRATOR_LOG_LEVEL");
       }
     });
 
@@ -323,8 +325,9 @@ describe("loadConfig", () => {
     });
 
     it("uses a config-specific error code", () => {
+      // PI_CODING_AGENT_DIR is now optional, so we test an invalid LOG_LEVEL instead
       try {
-        loadConfig({});
+        loadConfig({ ...minimalValidEnv(), ORCHESTRATOR_LOG_LEVEL: "invalid" });
         expect.unreachable("should have thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(OrchestratorError);

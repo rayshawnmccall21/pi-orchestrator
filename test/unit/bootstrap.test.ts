@@ -52,6 +52,7 @@ function createMockPaths(overrides?: Partial<OrchestratorPaths>): OrchestratorPa
     logRoot: "/project/.pi/orchestrator/logs",
     promptPath: "/pkg/prompts/ORCHESTRATOR.md",
     worktreeBase: "/project/.trees",
+    piCodingAgentDir: "/opt/pi",
     piBmadExtensionPath: "/project/extensions/pi-bmad.ts",
     piPiExtensionPath: "/opt/pi/extensions/pi-pi.ts",
     childProjectRoot: (worktreePath: string) => worktreePath,
