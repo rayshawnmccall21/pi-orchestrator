@@ -1071,3 +1071,46 @@ export interface PipelineResult {
   /** Run duration in milliseconds. */
   durationMs: number;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Headless Workflow Output (duck-typed from pi-bmad)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Structurally observed headless workflow result from pi-bmad child workers.
+ * Duck-typed — not imported from pi-bmad. The orchestrator parses this from
+ * child stdout JSON after the worker process exits.
+ *
+ * @see pi-bmad HeadlessWorkflowOutput<T> in src/types.ts
+ */
+export interface HeadlessWorkflowOutput {
+  /** Schema version — must be "pi-bmad.headless-workflow-result.v1". */
+  schemaVersion: "pi-bmad.headless-workflow-result.v1";
+  /** Workflow ID that was executed. */
+  workflow: string;
+  /** Per-workflow return type ID. */
+  returnType: string;
+  /** Overall execution status. */
+  status: "success" | "partial" | "failed";
+  /** Process exit code: 0=success, 1=failed, 2=partial. */
+  exitCode: 0 | 1 | 2;
+  /** Step IDs completed in order. */
+  completedSteps: string[];
+  /** Steps that failed with reasons. */
+  failedSteps: { step: string; reason: string }[];
+  /** Artifact key → file path map. */
+  artifacts: Record<string, string>;
+  /** Workflow-specific typed payload, or null on failure. */
+  payload: unknown;
+  /** ISO-8601 timestamp when the result was emitted. */
+  emittedAt: string;
+  /** Workflow run duration in milliseconds. */
+  durationMs: number;
+}
+
+/** Discriminated parse result for HeadlessWorkflowOutput from child stdout. */
+export type HeadlessOutputParseResult =
+  | { kind: "parsed"; output: HeadlessWorkflowOutput }
+  | { kind: "no-output"; reason: string }
+  | { kind: "corrupt-json"; rawError: string }
+  | { kind: "invalid-schema"; detail: string };
