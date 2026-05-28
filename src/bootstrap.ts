@@ -26,8 +26,11 @@ import {
 } from "./triage/authorization.js";
 import { createAtomicJsonStore, type AtomicJsonStore } from "./shared/atomic-json.js";
 import { createJsonlLogWriter } from "./shared/jsonl-log.js";
+import { createSpawnWorkerPool } from "./workers/pool/spawn-worker-pool.js";
+import { createGitPort } from "./shared/git.js";
+import { createCommandExecutor } from "./shared/process.js";
 import type { PipelineResult, PipelineRunState } from "./shared/types.js";
-import { createOrchestratorActions as createOrchestratorActionsFromDeps, type OrchestratorActions, type WorkerHandle } from "./actions.js";
+import { createOrchestratorActions as createOrchestratorActionsFromDeps, type OrchestratorActions } from "./actions.js";
 export type {
   WorktreeRegistryPort,
   WorkerPoolPort,
@@ -334,17 +337,10 @@ function buildDefaultDeps(): BootstrapDeps {
       getActiveEntries: () => [],
       removalDecision: () => ({ safe: true }),
     }),
-    createWorkerPool: () => ({
-      provision: () => Promise.reject(new Error("Worker pool not yet implemented")),
-      steer: () => Promise.reject(new Error("Worker pool not yet implemented")),
-      kill: () => Promise.resolve(),
-      killAll: () => Promise.resolve(),
-      getActiveWorkers: () => [] as WorkerHandle[],
-      getWorkerCount: () => 0,
-      onWorkerDone: () => () => {},
-      onWorkerStale: () => () => {},
-      dispose: () => {},
-    }),
+    createWorkerPool: () => {
+      // Real worker pool — will be wired with deps in buildReadyResult
+      return null as unknown as WorkerPoolPort;
+    },
     createScheduler: () => ({
       planNext: () => Promise.resolve({ dispatches: [], blocked: [], gateResults: [], requiredApprovals: [], nextAction: null }),
     }),
@@ -497,7 +493,15 @@ function buildReadyResult(params: {
   /** Tool health. */ toolHealth: ToolCheckResult[];
 }): BootstrapReady {
   const { resolvedDeps, config, paths, stateManager, eventBus, toolHealth } = params;
-  const workerPool = resolvedDeps.createWorkerPool();
+  const commandExecutor = createCommandExecutor();
+  const gitPort = createGitPort({ exec: commandExecutor, cwd: paths.projectRoot });
+  const workerPool = createSpawnWorkerPool({
+    exec: commandExecutor,
+    git: gitPort,
+    eventBus,
+    paths,
+    config,
+  });
   return {
     status: "ready",
     config,
