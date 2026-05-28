@@ -25,8 +25,9 @@ import {
   type AuthorizationPolicy,
 } from "./triage/authorization.js";
 import { createAtomicJsonStore, type AtomicJsonStore } from "./shared/atomic-json.js";
+import { createJsonlLogWriter } from "./shared/jsonl-log.js";
 import type { PipelineResult, PipelineRunState } from "./shared/types.js";
-import type { OrchestratorActions } from "./actions.js";
+import { createOrchestratorActions as createOrchestratorActionsFromDeps, type OrchestratorActions, type WorkerHandle } from "./actions.js";
 export type {
   WorktreeRegistryPort,
   WorkerPoolPort,
@@ -41,7 +42,7 @@ import type {
   TriageEnginePort,
   OrchestratorRunPort,
 } from "./bootstrap-ports.js";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Result of checking whether a tool is available. */
@@ -323,24 +324,49 @@ function buildDefaultDeps(): BootstrapDeps {
     createStateManager: (d) => defaultCreateStateManager(d),
     checkToolHealth: defaultCheckToolHealth,
     migrateState: defaultMigrateState,
-    createWorktreeRegistry: () => {
-      throw new Error("R-S7");
-    },
-    createWorkerPool: () => {
-      throw new Error("R-S8");
-    },
-    createScheduler: () => {
-      throw new Error("R-S9");
-    },
-    createTriageEngine: () => {
-      throw new Error("R-S10");
-    },
+    createWorktreeRegistry: () => ({
+      initialize: () => Promise.resolve(),
+      snapshot: () => ({}),
+      register: () => Promise.resolve(),
+      transition: () => Promise.resolve(),
+      heartbeat: () => Promise.resolve(),
+      getEntry: () => undefined,
+      getActiveEntries: () => [],
+      removalDecision: () => ({ safe: true }),
+    }),
+    createWorkerPool: () => ({
+      provision: () => Promise.reject(new Error("Worker pool not yet implemented")),
+      steer: () => Promise.reject(new Error("Worker pool not yet implemented")),
+      kill: () => Promise.resolve(),
+      killAll: () => Promise.resolve(),
+      getActiveWorkers: () => [] as WorkerHandle[],
+      getWorkerCount: () => 0,
+      onWorkerDone: () => () => {},
+      onWorkerStale: () => () => {},
+      dispose: () => {},
+    }),
+    createScheduler: () => ({
+      planNext: () => Promise.resolve({ dispatches: [], blocked: [], gateResults: [], requiredApprovals: [], nextAction: null }),
+    }),
+    createTriageEngine: () => ({
+      decideFailureResponse: () => ({ action: "block", reason: "Triage not yet implemented" }),
+    }),
     createAuthorizationPolicy: defaultCreateAuthorizationPolicy,
     createRunController: () => {
-      throw new Error("R-S12");
+      let paused = false;
+      let running = false;
+      return {
+        start: () => { running = true; paused = false; return Promise.resolve(); },
+        pause: () => { paused = true; },
+        resume: () => { paused = false; },
+        abort: () => { running = false; paused = false; return Promise.resolve(); },
+        isPaused: () => paused,
+        isRunning: () => running,
+      };
     },
     createActions: () => {
-      throw new Error("R-S13");
+      // Placeholder — buildReadyResult will override with real createOrchestratorActions
+      throw new Error("R-S13: use buildReadyResult override");
     },
   };
 }
@@ -386,7 +412,11 @@ export async function bootstrapOrchestrator(
     projectRoot: opts.projectRoot,
     env: resolvedEnv,
   });
-  const eventBus = resolvedDeps.createEventBus({ runId });
+  const auditLogWriter = createJsonlLogWriter(
+    join(paths.logRoot, "events.jsonl"),
+    { maxBytes: 50 * 1024 * 1024, maxFileCount: 5 },
+  );
+  const eventBus = resolvedDeps.createEventBus({ runId, logWriter: auditLogWriter });
   await resolvedDeps.migrateState({ projectRoot: opts.projectRoot, stateRoot: paths.stateRoot });
   const stateStore = createAtomicJsonStore<PipelineRunState>(paths.pipelineStatePath);
   const stateManager = resolvedDeps.createStateManager({ store: stateStore, eventBus });
@@ -480,7 +510,12 @@ function buildReadyResult(params: {
     triageEngine: resolvedDeps.createTriageEngine(),
     authorization: resolvedDeps.createAuthorizationPolicy(),
     run: resolvedDeps.createRunController(),
-    actions: resolvedDeps.createActions(),
+    actions: createOrchestratorActionsFromDeps({
+      run: resolvedDeps.createRunController(),
+      stateManager,
+      workerPool: workerPool as unknown as import("./actions.js").WorkerPool,
+      eventBus,
+    }),
     toolHealth,
     dispose: createDisposeFn(stateManager, eventBus, workerPool),
   };
