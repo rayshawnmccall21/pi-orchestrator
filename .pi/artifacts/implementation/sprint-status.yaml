@@ -1,0 +1,30 @@
+sprint:
+  id: sprint-1
+  name: "Orchestrator Bootstrap Fix"
+  goal: "Make the pi-orchestrator extension loadable by replacing throwing stubs with no-op implementations and wiring JSONL audit logging"
+  status: active
+
+stories:
+  - id: fix-bootstrap-stubs
+    title: "Replace throwing factory stubs with no-op implementations"
+    status: planned
+    priority: 1
+    description: >
+      buildDefaultDeps() in src/bootstrap.ts has 6 factory functions that throw
+      errors (R-S7 through R-S13). These crash the extension on session_start,
+      preventing the orchestrate tool from registering. Replace with working
+      no-op implementations that satisfy the interface contracts.
+    files:
+      - src/bootstrap.ts
+
+  - id: wire-jsonl-logging
+    title: "Wire JSONL audit logging in bootstrap"  
+    status: planned
+    priority: 2
+    depends_on: fix-bootstrap-stubs
+    description: >
+      Bootstrap creates the event bus without a logWriter, so no events are
+      written to disk. Create a JsonlLogWriter at paths.logRoot and pass it
+      to createEventBus({ runId, logWriter }).
+    files:
+      - src/bootstrap.ts
