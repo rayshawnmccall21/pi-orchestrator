@@ -1,30 +1,23 @@
 sprint:
-  id: sprint-1
-  name: "Orchestrator Bootstrap Fix"
-  goal: "Make the pi-orchestrator extension loadable by replacing throwing stubs with no-op implementations and wiring JSONL audit logging"
+  id: sprint-2
+  name: "Wire Real Orchestration"
+  goal: "Make orchestrate start actually dispatch pi-bmad workers via workerPool.provision() and log typed HeadlessWorkflowOutput results to JSONL"
   status: active
 
 stories:
-  - id: fix-bootstrap-stubs
-    title: "Replace throwing factory stubs with no-op implementations"
+  - id: wire-real-dispatch
+    title: "Wire orchestrate start to spawn headless pi-bmad workers and collect typed results"
     status: planned
     priority: 1
     description: >
-      buildDefaultDeps() in src/bootstrap.ts has 6 factory functions that throw
-      errors (R-S7 through R-S13). These crash the extension on session_start,
-      preventing the orchestrate tool from registering. Replace with working
-      no-op implementations that satisfy the interface contracts.
+      The orchestrate tool's start action sets a boolean but doesn't dispatch work.
+      The run controller needs to call workerPool.provision() which calls 
+      createSpawnWorkerPool's provision() — creating a git worktree and spawning 
+      a headless pi process. The spawn callback already parses HeadlessWorkflowOutput 
+      and emits events. The run controller just needs to: (1) call stateManager.apply 
+      to set status running, (2) call workerPool.provision with workflow config,
+      (3) register onWorkerDone callback to log results and transition FSM state.
     files:
+      - src/run/controller/index.ts
       - src/bootstrap.ts
-
-  - id: wire-jsonl-logging
-    title: "Wire JSONL audit logging in bootstrap"  
-    status: planned
-    priority: 2
-    depends_on: fix-bootstrap-stubs
-    description: >
-      Bootstrap creates the event bus without a logWriter, so no events are
-      written to disk. Create a JsonlLogWriter at paths.logRoot and pass it
-      to createEventBus({ runId, logWriter }).
-    files:
-      - src/bootstrap.ts
+      - src/actions.ts
