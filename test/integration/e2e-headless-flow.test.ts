@@ -5,11 +5,10 @@
  *
  * This test spawns a REAL pi-bmad process in a temporary directory.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "fs";
+import { describe, it, expect, beforeAll } from "vitest";
+import { mkdtempSync, readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { execSync, spawn } from "child_process";
 import { bootstrapOrchestrator } from "../../src/bootstrap.js";
 import { parseHeadlessOutput } from "../../src/events/headless-output-parser.js";
 import { mapResultToOutcome } from "../../src/state/result-mapper.js";
@@ -279,14 +278,15 @@ describe("E2E: Headless workflow result flow", () => {
     const workerEvents = events.filter((e: any) => e.kind === "worker_state_changed");
     expect(workerEvents.length).toBe(5);
 
-    // Verify each workflow's typed payload appears in the logs
-    expect(workerEvents[0].payload.reason).toContain('"storyId":"test-1"');
-    expect(workerEvents[0].payload.reason).toContain('"acceptanceCriteriaCount":5');
-    expect(workerEvents[2].payload.reason).toContain('"testsAdded":8');
-    expect(workerEvents[2].payload.reason).toContain('"testsPassed":true');
-    expect(workerEvents[3].payload.reason).toContain('"scenariosPassed":4');
-    expect(workerEvents[3].payload.reason).toContain('"verdict":"pass"');
-    expect(workerEvents[4].payload.reason).toContain('"verdict":"approved"');
+    // Verify each workflow's typed payload appears in the logs, independent of event order
+    for (const key of devLoop) {
+      const output = SIMULATED_OUTPUTS[key]!;
+      const expectedPayload = JSON.stringify(output.payload);
+      const hasTypedPayload = workerEvents.some((event: any) =>
+        typeof event.payload.reason === "string" && event.payload.reason.includes(expectedPayload)
+      );
+      expect(hasTypedPayload, `Missing typed payload for ${key}: ${expectedPayload}`).toBe(true);
+    }
 
     // Should have pipeline_status_changed: idle → done
     const statusEvents = events.filter((e: any) => e.kind === "pipeline_status_changed");
