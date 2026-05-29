@@ -161,6 +161,16 @@ create-story ──success──► e2e-plan ──success──► dev-story
                           └────► dev-story ◄─────┘
 ```
 
+### pi-bmad Provider Documentation
+
+The provider-side contract is documented at:
+- pi-bmad `.pi/SYSTEM.md` §7 — headless CLI, return contract, envelope structure
+- pi-bmad `docs/ARCHITECTURE.md` "Headless Execution & External Integration" section
+- pi-bmad `docs/adr/0019-structured-workflow-result.md` — full ADR with examples
+- pi-bmad `src/types.ts` — `HeadlessWorkflowOutput<T>`, `WorkflowReturnContract`
+- pi-bmad `content/schemas/` — per-workflow JSON Schemas
+- GitHub: `github.com/rayshawnmccall21/pi-bmad`
+
 ## 6) Commands
 - `npm run test:unit` — run unit tests
 - `npm run test:integration` — run integration tests
